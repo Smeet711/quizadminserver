@@ -3,6 +3,15 @@ const cors = require("cors");
 const express = require("express");
 const connectDB = require("./ConnectDb");
 // const connectDB2 = require("./ConnectDb");
+
+const multer = require('multer');
+const csv = require('fast-csv');
+const mongodb = require('mongodb');
+const fs = require('fs');
+const { ObjectID } = require('mongodb');
+
+
+
 const Question = require('./models/Questions')
 
 const app = express();
@@ -13,6 +22,151 @@ app.use(express.json());
 
 connectDB()
 
+
+// csv file upload code starts
+
+
+// Set global directory
+global.__basedir = __dirname;
+
+// Multer Upload Storage
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, __basedir + '/uploads/');
+    },
+    filename: (req, file, cb) => {
+        cb(null, file.fieldname + "-" + Date.now() + "-" + file.originalname);
+    }
+});
+
+// Filter for CSV file
+const csvFilter = (req, file, cb) => {
+    if (file.mimetype.includes("csv")) {
+        cb(null, true);
+    } else {
+        cb("Please upload only csv file.", false);
+    }
+};
+
+const upload = multer({ storage: storage, fileFilter: csvFilter });
+
+// Function to transform CSV data to the desired format
+function transformCSVData(row) {
+  const question = row.Question;
+  const category = row.Category;
+  const correctAnswer = parseInt(row.CorrectAnswer);
+
+  const options = Object.entries(row)
+    .filter(([key, value]) => key.startsWith('Option'))
+    .map(([key, value]) => {
+      const optionValue = value.trim();
+      const optionNumber = parseInt(key.replace('Option', ''));
+      const isCorrect = optionNumber === correctAnswer;
+
+      console.log(`Option: ${optionValue}, isCorrect: ${isCorrect}`); // Debugging line
+
+      return {
+        answer: optionValue,
+        isCorrect: isCorrect,
+        _id: new ObjectID(),
+      };
+    });
+
+  return {
+    question: question,
+    category: category,
+    answerOptions: options,
+    __v: { numberInt: "0" },
+  };
+}
+
+
+
+
+// Upload CSV file using Express Rest APIs
+app.post('/api/upload-csv-file', upload.single("file"), (req, res) => {
+    try {
+        if (req.file == undefined) {
+            return res.status(400).send({
+                message: "Please upload a CSV file!"
+            });
+        }
+
+        // Import CSV File to MongoDB database
+        let csvData = [];
+        let filePath = __basedir + '/uploads/' + req.file.filename;
+        fs.createReadStream(filePath)
+            .pipe(csv.parse({ headers: true }))
+            .on("error", (error) => {
+                throw error.message;
+            })
+            .on("data", (row) => {
+                const transformedData = transformCSVData(row);
+                csvData.push(transformedData);
+            })
+            .on("end", () => {
+                // Establish connection to the database
+                const url = process.env.MONGODB_URI;
+                let dbConn;
+                mongodb.MongoClient.connect(url, {
+                    useUnifiedTopology: true,
+                }).then((client) => {
+                    dbConn = client.db();
+
+                    // Insert into the collection "questions"
+                    const collectionName = 'questions';
+                    const collection = dbConn.collection(collectionName);
+                    collection.insertMany(csvData, (err, result) => {
+                        if (err) {
+                            console.log(err);
+                        }
+                        if (result) {
+                            res.status(200).send({
+                                message: "Upload/import the CSV data into the database successfully: " + req.file.originalname,
+                                
+                            });
+
+
+
+
+                            client.close();
+                        }
+                    });
+                }).catch(err => {
+                    res.status(500).send({
+                        message: "Fail to import data into the database!",
+                        error: err.message,
+                    });
+                });
+            });
+    } catch (error) {
+        console.log("catch error-", error);
+        res.status(500).send({
+            message: "Could not upload the file: " + req.file.originalname,
+        });
+    }
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// csv file upload code ends
 
 app.post("/post",async(req,res)=>{
     console.log(req.body);
