@@ -13,6 +13,7 @@ const { ObjectID } = require('mongodb');
 
 
 const Question = require('./models/Questions')
+const Category = require('./models/Categories')
 
 const app = express();
 const PORT =  8000;
@@ -168,6 +169,55 @@ app.post('/api/upload-csv-file', upload.single("file"), (req, res) => {
 
 // csv file upload code ends
 
+
+// new category starts 
+
+// POST /admin/categories - Create a new category
+app.post('/categories', async (req, res) => {
+  try {
+    const { name, description } = req.body;
+
+    // Check if the category already exists
+    const existingCategory = await Category.findOne({ name });
+    if (existingCategory) {
+      return res.status(400).json({ error: 'Category already exists' });
+    }
+
+    // Create a new category
+    const newCategory = new Category({
+      name,
+      description,
+    });
+
+    // Save the category to the database
+    await newCategory.save();
+
+    res.status(201).json(newCategory);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+
+app.get('/categories', async (req, res) => {
+  try {
+    // Fetch all categories from the database
+    const categories = await Category.find();
+
+    res.status(200).json(categories);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+
+
+
+
+// new category ends
+
 app.post("/post",async(req,res)=>{
     console.log(req.body);
     res.status(200).json({ message: "POST request received successfully" });
@@ -202,7 +252,7 @@ app.get('/api/questions', async (req, res) => {
   app.post('/api/createquestions', async (req, res) => {
     try {
       // Extract data from the request body
-      const { question, category, answerOptions } = req.body;
+      const { question, category,level, answerOptions } = req.body;
   
       // Set isCorrect to true or false for each answer option
       const formattedAnswerOptions = answerOptions.map((option) => ({
@@ -214,6 +264,7 @@ app.get('/api/questions', async (req, res) => {
       const newQuestion = new Question({
         question,
         category,
+        level,
         answerOptions: formattedAnswerOptions,
       });
   
