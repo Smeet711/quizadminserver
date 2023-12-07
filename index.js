@@ -200,7 +200,7 @@ app.post('/categories', async (req, res) => {
 });
 
 
-app.get('/categories', async (req, res) => {
+app.get('/allcategories', async (req, res) => {
   try {
     // Fetch all categories from the database
     const categories = await Category.find();
@@ -211,6 +211,58 @@ app.get('/categories', async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
+
+
+app.get('/onlyactivecategories', async (req, res) => {
+  try {
+    // Fetch only active categories from the database
+    const categories = await Category.find({ isActive: true });
+
+    res.status(200).json(categories);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+
+
+
+
+// updating isactive starts 
+
+app.put('/updatecategory/:id',async(req,res)=>{
+  try{
+
+    const {id} = req.params;
+    const category = await Category.findById({_id: id});
+    if(!category) return res.status(400).json({msg: "Category not found"});
+
+    if(category.isActive === true){
+      category.isActive = false;
+      await category.save();
+      return res.status(200).json({msg:"category Disactiviated"})
+    }else{
+      category.isActive = true;
+      await category.save();
+      return res.status(200).json({msg:"category Activiated"})
+    }
+  }catch(error){
+    console.log(error);
+    res.status(500).json({error: "server error"})
+  }
+})
+
+
+
+
+
+
+
+
+
+
+
 
 
 
