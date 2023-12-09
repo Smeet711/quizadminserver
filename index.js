@@ -288,15 +288,42 @@ app.get('/api/questions', async (req, res) => {
   });
 
 
-  app.get('/api/questionfour', async (req, res) => {
+  // app.get('/api/questionfour', async (req, res) => {
+  //   try {
+  //     const questions = await Question.find().limit(4);
+  //     res.status(200).json(questions);
+  //   } catch (error) {
+  //     console.error('Error fetching questions:', error);
+  //     res.status(500).json({ error: 'Internal Server Error' });
+  //   }
+  // });
+
+  app.get('/api/questionsfour', async (req, res) => {
     try {
-      const questions = await Question.find().limit(4);
+      const requestedCategory = req.query.category;
+  
+      // Query MongoDB to get four random questions of the specified category
+      const questions = await Question.aggregate([
+        { $match: { category: requestedCategory } },
+        { $sample: { size: 4 } },
+      ]);
+  
       res.status(200).json(questions);
     } catch (error) {
       console.error('Error fetching questions:', error);
       res.status(500).json({ error: 'Internal Server Error' });
     }
   });
+  
+
+
+
+
+
+
+
+
+
 
 
 
